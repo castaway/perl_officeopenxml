@@ -36,13 +36,12 @@ sub dereference {
 
   print "Rels file at $rels_uri\n";
 
-  my $rels = $rest->{presentation}->parsed($rest->{presentation}->opc_relaxng_path.'opc-relationships.rnc', $rels_uri);
+  my $rels = $rest->{presentation}->parsed($rels_uri);
   #Dump $rels;
   my $relref = $rels->get_by_id($self->rid);
   my $target = $relref->Target()->as_string;
   $target = $from_uri->parent->file($target);
-  my $rel = $rest->{presentation}->parsed($rest->{presentation}->transitional_relaxng_path . 'PresentationML_Slide.rnc',
-                                          $target->stringify);
+  my $rel = $rest->{presentation}->parsed($target->stringify);
 
   #Dump $rel;
 

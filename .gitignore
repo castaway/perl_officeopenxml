@@ -4,3 +4,4 @@ MYMETA.*
 spec/*.zip
 spec/*.pdf
 Makefile
+t/var/

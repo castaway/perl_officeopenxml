@@ -26,4 +26,13 @@ sub get_file {
   return $self->archive->contents($name);
 }
 
+sub save_file {
+  my ($self, $data, $filename) = @_;
+
+  $filename->parent->mkpath;
+  open(my $out_fh, ">", $filename) or die "Can't open $filename for writing: $!";
+  $out_fh->print($data->toString);
+  $out_fh->close;
+}
+
 "¡Ándele! ¡Ándele! ¡Arriba! ¡Arriba! ¡Epa! ¡Epa! ¡Epa! Yeehaw!";

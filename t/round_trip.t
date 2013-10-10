@@ -13,6 +13,7 @@ my $pres = XML::OpenXMLFormats::PresentationML->new(
     file => $input_file,
     );
 
-$pres->test_to_dom();
+$pres->save('t/var/round_trip_test');
+#$pres->test_to_dom();
 
 done_testing;

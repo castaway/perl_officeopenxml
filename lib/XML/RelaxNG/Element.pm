@@ -155,7 +155,9 @@ sub from_dom {
   my ($self, $dom, $rest) = @_;
 
   print "Element from_dom ", $self->name, "\n";
+  my $dom_doc;
   if ($dom->isa('XML::LibXML::Document')) {
+    $dom_doc = $dom;
     $dom = $dom->documentElement;
   }
 
@@ -171,7 +173,19 @@ sub from_dom {
   }
 
   my $ret_class = $self->class;
-  my $ret = $ret_class->new_object();
+  my $ret;
+  if($dom_doc) {
+    ## Set the original filename on the toplevel element:
+    $self->class->add_attribute('_filename', 
+                                {
+                                 is => 'ro',
+                                 reader => '_filename',
+                                 predicate => 'has__filename',
+                                });
+    $ret = $ret_class->new_object( '_filename' => $dom_doc->URI());
+  } else {
+    $ret = $ret_class->new_object();
+  }
 #  my $ret = {};
   # Hmm, shouldn't this specify "the inside of" somehow?
   #my @children;
