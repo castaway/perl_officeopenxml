@@ -117,18 +117,4 @@ sub to_dom {
   return {ns => $self->namespace_uri, name => $self->name, value => $value};
 }
 
-sub get_relaxng_thing_for {
-  my ($self, $long_name) = @_;
-
-  if ($self->full_name eq '*') {
-    print "Attribute * matching $long_name\n";
-    return $self;
-  }
-
-  return $self if $self->long_name eq $long_name;
-
-  return $self->pattern->get_relaxng_thing_for($long_name);
-
-}
-
 1;

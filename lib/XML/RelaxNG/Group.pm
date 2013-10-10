@@ -47,28 +47,16 @@ has 'member_map', is => 'ro', lazy => 1,
 sub add_attributes_for_class {
   my ($self, $class, $element) = @_;
 
-  my $map = $self->member_map;
+#  my $map = $self->member_map;
 
   my @ret;
 
-  for my $xml_subthingy (values %{$map->{attribute}}, values %{$map->{element}}, @{$map->{text}}) {
+#  for my $xml_subthingy (values %{$map->{attribute}}, values %{$map->{element}}, @{$map->{text}}) {
+  for my $xml_subthingy (@{ $self->members }) {
     push @ret, $xml_subthingy->add_attributes_for_class($class, $element);
   }
 
   return @ret;
-}
-
-sub get_relaxng_thing_for {
-  my ($self, $long_name) = @_;
-
-  my $map = $self->member_map;
-
-  for my $xml_subthingy (values %{$map->{attribute}}, values %{$map->{element}}, @{$map->{text}}) {
-    print "get_relaxng_thing_for (group): Looking for $long_name, at $xml_subthingy, " , $xml_subthingy->as_debug_string, "\n";
-    if($xml_subthingy->get_relaxng_thing_for($long_name)) {
-      return $xml_subthingy->get_relaxng_thing_for($long_name);
-    }
-  }  
 }
 
 sub as_debug_string {

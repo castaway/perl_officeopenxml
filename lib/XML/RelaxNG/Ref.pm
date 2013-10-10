@@ -7,7 +7,7 @@ has 'top', is => 'ro';
 has('resolve',
     is => 'ro',
     lazy => 1,
-    handles => ['node_type', 'xml_name', 'name', 'class', 'add_attributes_for_class', 'get_relaxng_thing_for', 'to_dom'],
+    handles => ['node_type', 'xml_name', 'name', 'class', 'add_attributes_for_class', 'to_dom'],
     default => sub {
       my ($self) = @_;
 

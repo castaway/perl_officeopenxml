@@ -82,12 +82,6 @@ sub add_attributes_for_class {
   $self->values->[0]->add_attributes_for_class($class, $element);
 }
 
-sub get_relaxng_thing_for {
-  my ($self, $long_name) = @_;
-
-  return $self->values->[0]->get_relaxng_thing_for($long_name);
-}
-
 sub from_dom {
   my ($type, $dom, $rest) = @_;
 

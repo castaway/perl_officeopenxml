@@ -7,9 +7,9 @@ use Test::More;
 
 my $input_file = 't/data/fyp.pptx';
 
-use_ok('XML::OpenFormats::PresentationML');
+use_ok('XML::OpenXMLFormats::PresentationML');
 
-my $pres = XML::OpenFormats::PresentationML->new(
+my $pres = XML::OpenXMLFormats::PresentationML->new(
     file => $input_file,
     );
 

@@ -35,15 +35,6 @@ sub add_attributes_for_class {
                                     });
 }
 
-sub get_relaxng_thing_for {
-  my ($self, $long_name) = @_;
-
-  return $self if $self->long_name eq $long_name;
-
-  return undef;
-
-}
-
 sub node_type {
   my ($self) = @_;
 

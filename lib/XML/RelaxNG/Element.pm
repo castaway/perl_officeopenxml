@@ -60,10 +60,10 @@ has 'class', is => 'ro', lazy => 1,
       print ">>> constructed class named $class_name, our ordered attributes\n";
       print " - $_\n" for map {$_->name} @{$self->ordered_attributes};
       print ">>> attribute mapping\n";
-      for my $name (keys %{$self->attribute_mapping}) {
-        my $value = $self->attribute_mapping->{$name};
+      for my $value (@{$self->attribute_mapping}) {
         my $mma = $value->{mma};
         my $rng = $value->{rng}->full_name;
+        my $name = $mma->name;
         print " - $name => mma=$mma, rng=$rng\n";
       }
       print "\n";
@@ -71,7 +71,7 @@ has 'class', is => 'ro', lazy => 1,
       return $class;
     };
 has 'ordered_attributes', is => 'rw', default => sub {[]};
-has 'attribute_mapping',  is => 'rw', default => sub {{}};
+has 'attribute_mapping',  is => 'rw', default => sub {[]};
 
 sub namespace_uri {
   my ($self) = @_;
@@ -117,8 +117,10 @@ sub add_attribute {
   # $mma should be a Moose::Meta::Attribute
   # $rng_thingy should be a XML::RelaxNG::{Attribute,Element} (or a text?)
 
-  $self->attribute_mapping->{$long_name}{mma} = $mma;
-  $self->attribute_mapping->{$long_name}{rng} = $rng_thingy;
+  push @{ $self->attribute_mapping }, { mma => $mma, rng => $rng_thingy };
+
+#  $self->attribute_mapping->{$long_name}{mma} = $mma;
+#  $self->attribute_mapping->{$long_name}{rng} = $rng_thingy;
 
   'You forgot to return the right thing, you dufus';
 }
@@ -264,10 +266,12 @@ sub to_dom {
   for my $value (@$values) {
     my $got_it;
 
-    for my $attr_name (keys %{$self->attribute_mapping}) {
-      my $attrib = $self->attribute_mapping->{$attr_name}->{mma};
-      my $relaxngthing = $self->attribute_mapping->{$attr_name}->{rng};
-      my $method_name = $attr_name; # $attrib->name;
+    ## Must do all these things in order! Make sure all the things return lists.. 
+#    for my $attr_name (keys %{$self->attribute_mapping}) {
+    for my $attr (@{$self->attribute_mapping}) {
+      my $attrib = $attr->{mma};
+      my $relaxngthing = $attr->{rng};
+      my $method_name = $attrib->name;
       my $pred_name = $attrib->predicate;
 
       print "In Element.pm to_dom, value $value vs self's attribute $method_name\n";
