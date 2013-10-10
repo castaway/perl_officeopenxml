@@ -1,0 +1,13 @@
+Relax NG, opc-relationships.rnc
+
+start = Relationships
+# works
+
+Relationships = element Relationships { CT_Relationships }
+# not recognised as grammar line?
+# probably:
+
+'=' == assignOp
+identifier '=' primary ? (primary == innerParticle == pattern)
+primary:
+ 'element' nameClass '{' pattern '}'

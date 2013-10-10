@@ -1,0 +1,6 @@
+*~
+lib/XML/RelaxNG/Compact/Parser.pm
+MYMETA.*
+spec/*.zip
+spec/*.pdf
+Makefile

@@ -1,0 +1,657 @@
+# header
+
+# Process as: eyapp -vN -o lib/XML/RelaxNG/Compact/Parser.pm -m XML::RelaxNG::Compact::Parser lib/XML/RelaxNG/Compact-reduced.yapp
+
+%strict
+%token CName
+%token nsName
+%token literalSegment
+%token documentation
+%token identifier
+
+%{
+ use feature 'say';
+ use Data::Dump::Streamer 'Dump', 'Dumper';
+ use XML::RelaxNG::PartialType;
+ use XML::RelaxNG::Annotation;
+ use XML::RelaxNG::Ref;
+ use XML::RelaxNG::Element;
+ use XML::RelaxNG::Repeated;
+ use XML::RelaxNG::Group;
+ use XML::RelaxNG::Choice;
+ use XML::RelaxNG::Interleave;
+ use XML::RelaxNG::Text;
+ use XML::RelaxNG::FooType;
+ use XML::RelaxNG::Attribute;
+ use XML::RelaxNG::Literal;
+ use XML::RelaxNG::Empty;
+ no indirect;
+%}
+
+%%
+
+# rules
+
+# http://relaxng.org/compact-20021121.html#syntax
+# http://relaxng.org/compact-20021121.html#formal-syntax
+
+topLevel: # Element  ::=
+    preamble.pre { $_[0]{USER}{topthingy}->do_preamble($pre) } topLevelBody.body
+     {
+      { preamble => $pre,
+         body => $body }
+     }
+    ;
+
+preamble: # Environment  ::=
+    # empty
+        { +{ namespace_prefix_xml => 'http://www.w3.org/XML/1998/namespace',
+             datatype_prefix_xsd  => 'http://www.w3.org/2001/XMLSchema-datatypes' } }
+    |  decl.left  preamble.right
+        { +{ %$left, %$right } }
+    ;
+
+decl: # Environment  ::=
+    'default'  'namespace'  '='  namespaceURILiteral.uri
+        #Constraint: xml namespace URI
+        #Constraint: duplicate declaration
+        { {'__default_namespace' => $uri} }
+    | 'default'  'namespace'  namespacePrefix.prefix'='  namespaceURILiteral.uri
+        #Constraint: xml namespace URI
+        #Constraint: duplicate declaration
+        { +{'__default_namespace' => $uri,
+           "namespace_prefix_$prefix" => $uri
+           }
+        }
+    |  'namespace'  namespacePrefix.prefix  '='  namespaceURILiteral.uri
+        #Constraint: xml prefix
+        #Constraint: xml namespace URI
+        #Constraint: duplicate declaration
+        { +{ "namespace_prefix_$prefix" => $uri } }
+
+    ;
+
+namespacePrefix: # String  ::=
+    identifierOrKeyword
+        #Constraint: valid prefix
+    ;
+
+namespaceURILiteral: # NamespaceURI  ::=
+    literal.lit
+    ;
+
+literal: # String  ::=
+    literalSegment.lit
+    { 
+     $lit->[2] # 0, 1 are the line:column the literal was on
+    }
+    ;
+
+topLevelBody: # Element  ::=
+    grammar
+        { $_[1] }
+    ;
+
+grammar: # Elements  ::=
+    member.left grammar.right
+        {
+          # my $new = {};
+
+          # say "";
+          # say "Merging: ";
+          # print Dumper [$left, $right];
+
+          # my $new = {%$right};
+          # my @kv_list = %$left;
+
+          # while (@kv_list) {
+          #   my $key = shift @kv_list;
+          #   my $val = shift @kv_list;
+            
+          #   my $this_op = $val->{op};
+          #   my $this_values = $val->{values};
+          #   my $prev = $new->{$key};
+          #   my $prev_op = $prev ? $prev->{op} : 'none';
+          #   my $prev_values = $prev ? $prev->{values} : [];
+
+          #   if ($this_op eq '=' and not $prev) {
+          #     $new->{$key} = {op => '=', values => $this_values };
+          #   } elsif ($this_op eq '&=' and $prev_op eq 'none') {
+          #     $new->{$key} = {op => '&', values => $this_values };
+          #   } elsif ($this_op eq '&' and $prev_op eq '&') {
+          #     $new->{$key} = {op => '&', values => [ @$prev_values, @$this_values] };
+          #   } else {
+          #     die "key=$key, this_op=$this_op, prev_op=$prev_op";
+          #   }
+          # }
+
+          # say "Merged";
+          # print Dumper $new;
+          # say "";
+
+          # return $new;
+        }
+    | # empty
+        { {}; }
+    ;
+
+member: # Element  ::=
+    annotatedComponent.component
+     {
+      return $_[1];
+     };
+
+annotatedComponent: # Element  ::=
+    annotations.annotations component.component
+    {
+     if ($annotations) {
+        die "FIXME";
+     } else {
+        return $component;
+     }
+    }
+    ;
+
+component: # Element  ::=
+    start
+    | define
+    | include
+    ;
+
+start: # Element  ::=
+    'start'  assignOp.op pattern.pat
+        {
+          $_[0]{USER}{topthingy}->add_type(
+             XML::RelaxNG::PartialType->new(name => '__start',
+                                            op => $op,
+                                            values => [$pat]));
+        }
+    ;
+
+define: # Element  ::=
+    identifier.id assignOp.op  pattern.pat
+        {       $_[0]{USER}{topthingy}->add_type(
+                   XML::RelaxNG::PartialType->new(name => $id->[2],
+                                                  op => $op,
+                                                  values => [$pat]));
+        }
+    ;
+
+include: # Element  ::=
+    'include'  anyURILiteral.uri optInherit.oinherit  optIncludeBody.obody
+        {
+         $_[0]{USER}{topthingy}->do_include({ uri => $uri, 
+                                              inherit => $oinherit, 
+                                              include_body => $obody,
+                                              base_filename => $_[0]{USER}{filename}
+                                            });
+        }
+    ;
+
+anyURILiteral: # String  ::=
+    literal
+       # Constraint: any URI
+    ;
+
+optInherit: # Attributes  ::=
+    # empty
+    |  'inherit'  '='  identifierOrKeyword
+        { "makeNsAttribute(lookupPrefix(environment, x))" }
+    ;
+
+optIncludeBody: # Elements  ::=
+    # empty
+    |  '{'  includeBody '}'
+        { $_[2] }
+    ;
+
+includeBody: # Elements  ::=
+    # empty
+    |  includeMember includeBody
+        { +[ $_[1], $_[2] ] }
+    ;
+
+includeMember: # Element  ::=
+    annotatedIncludeComponent
+    |  annotationElementNotKeyword
+    ;
+
+annotatedIncludeComponent: # Element  ::=
+    annotations includeComponent
+        { "applyAnnotations($_[1], $_[2])" }
+    ;
+
+includeComponent: # Element  ::=
+    start
+    |  define
+    |  includeDiv
+    ;
+
+assignOp: # Attributes  ::=
+    '='
+        { '=' }
+    |  '|='
+        { '|=' }
+    |  '&='
+        { '&=' }
+    ;
+
+
+pattern: # Elements  ::=
+    innerPattern #(anno := ( ))
+    ;
+
+innerPattern: #(Xml anno): # Elements  ::=
+    innerParticle
+    | particleChoice
+    | particleGroup
+    | particleInterleave
+    | annotatedDataExcept
+    ;
+
+# JMM: convert right-recursive to native list?
+particleChoice: # Elements  ::=
+    particle.left '|'  particle.right
+        { XML::RelaxNG::Choice->new(members => [$left, $right]); }
+    |  particle.left '|'  particleChoice.right
+        { XML::RelaxNG::Choice->new(members => [$left, @{$right->members}]); }
+    ;
+
+#particleChoice: # Elements  ::=
+#    particle<+ '|'>
+#      { return { '|' => $_[1] }; }
+#    ;
+
+
+
+particleGroup: # Elements  ::=
+    particle.left ','  particle.right
+        { XML::RelaxNG::Group->new(members => [$left, $right]); }
+    |  particle.left ','  particleGroup.right
+        { XML::RelaxNG::Group->new(members => [$left, @{$right->members}]); }
+    ;
+
+particleInterleave: # Elements  ::=
+    particle.left '&'  particle.right
+        { XML::RelaxNG::Interleave->new(members => [$left, $right]); }
+    |  particle.left '&'  particleInterleave.right
+        { XML::RelaxNG::Interleave->new(members => [$left, @{$right->{members}}]); }
+    ;
+
+particle: # Elements  ::=
+    innerParticle # (anno := ( ))
+    ;
+
+innerParticle: #(Xml anno): # Elements  ::=
+    annotatedPrimary
+    |  repeatedPrimary.repPrimary followAnnotations.follow
+       { if ($follow) {
+           die "FIXME";
+         } else {
+           return $repPrimary;
+         }
+       }
+    ;
+
+repeatedPrimary: # Element  ::=
+    annotatedPrimary '*'
+        { XML::RelaxNG::Repeated->new({ max_repeat => 999e999,
+                                        min_repeat => 0,
+                                        of => $_[1]}); }
+    |  annotatedPrimary '+'
+        { XML::RelaxNG::Repeated->new({ max_repeat => 999e999,
+                                        min_repeat => 1,
+                                        of => $_[1]}); }
+    |  annotatedPrimary '?'
+        { XML::RelaxNG::Repeated->new({ max_repeat => 1,
+                                        min_repeat => 0,
+                                        of => $_[1]}); }
+    ;
+
+annotatedPrimary: # Elements  ::=
+    leadAnnotatedPrimary.pri followAnnotations.follow
+        { if($follow) {
+            die "FIXME";
+          } else {
+            return $pri;
+          }
+        }
+    ;
+
+leadAnnotatedPrimary: # Elements  ::=
+    annotations.anno primary.of
+      {
+        if($anno) {
+          XML::RelaxNG::Annotation->new(annotation => $anno,
+                                        of => $of);
+        } else {
+         $of;
+        }
+      }
+    | annotations.anno '(' innerPattern.of ')'
+      {
+        if($anno) {
+          XML::RelaxNG::Annotation->new(annotation => $anno,
+                                        of => $of);
+        } else {
+            $of;
+        }
+      }
+    ;
+
+primary: # Element  ::=
+    'element'  nameClass.name  '{'  pattern.pat  '}'
+        { 
+          my $full_name = $_[0]{USER}{topthingy}->resolve_document_name($name);
+          XML::RelaxNG::Element->new(rnc_file => $_[0]{USER}{topthingy}->filename, top => $_[0]{USER}{topthingy}, name => $name, full_name => $full_name, pattern => $pat);
+        }
+    |  'attribute'  nameClass.name  '{'  pattern.pat  '}'
+        { 
+          my $full_name = $_[0]{USER}{topthingy}->resolve_document_name($name);
+          XML::RelaxNG::Attribute->new({ rnc_file => $_[0]{USER}{topthingy}->filename, 
+                                         top => $_[0]{USER}{topthingy}, 
+                                         name => $name, 
+                                         full_name => $full_name,
+                                         pattern => $pat});
+        }
+    |  'mixed'  '{'  pattern.pat  '}'
+        { 
+          XML::RelaxNG::Interleave->new(members => [XML::RelaxNG::Text->new(), $pat]); 
+         }
+    |  'list'  '{'  pattern '}'
+        { "<list> x </list>" }
+    |  datatypeName.name optParams.params
+        { 
+          my $top = $_[0]{USER}{topthingy};
+          my $full_name = $top->resolve_datatype_name($name);
+          XML::RelaxNG::FooType->new({'type' => $full_name,
+                                      'type_params' => $params
+                                     });
+        }
+    |  datatypeName.name datatypeValue.value
+        {
+                  my $top = $_[0]{USER}{topthingy};
+          my $full_name = $top->resolve_datatype_name($name);
+          XML::RelaxNG::FooType->new({'type' => $full_name,
+                                      'value' => $value
+                                     });
+        }
+    |  datatypeValue
+    |  'empty'
+        { XML::RelaxNG::Empty->new; }
+    |  'notAllowed'
+        { "<notAllowed/>" }
+    |  'text'
+        # This appears to be a bug in the spec -- it specifies "empty" twice, and "text" not at all, in the formal spec.  The informal spec lists text.
+        { XML::RelaxNG::Text->new() }
+    |  ref
+        { XML::RelaxNG::Ref->new('ref' => $_[1],
+                                 top => $_[0]{USER}{topthingy});
+         }
+    |  'parent'  ref
+        { "<parentRef name=x/>" }
+    |  'grammar'  '{'  grammar '}'
+        { "<grammar> x </grammar>" }
+    |  'external'  anyURILiteral optInherit
+        { "<externalRef href=mapSchemaRef(x) y/>" }
+    ;
+
+dataExcept: # Element  ::=
+    datatypeName  optParams  '-'  leadAnnotatedPrimary
+        { say "<data x> y <except> z </except> </data>" }
+    ;
+
+ref: # String  ::=
+    identifier
+     { $_[1][2] }
+    ;
+
+datatypeName: # Attributes  ::=
+    CName
+        { $_[1][2] }
+    |  'string'
+        { 'xsd:string' }
+    |  'token'
+        { '__token__' }
+    ;
+
+datatypeValue: # String  ::=
+    literal.lit
+     { XML::RelaxNG::Literal->new(text => $lit); }
+    ;
+
+optParams: # Elements  ::=
+    # empty
+        { +[] }
+    |  '{'  params.p '}'
+        { $p }
+    ;
+
+params: # Elements  ::=
+    # empty
+        { say "( )" }
+    |  param  params
+        { say "(x, y)" }
+    ;
+
+param: # Element  ::=
+    annotations identifierOrKeyword  '='  literal
+        { "applyAnnotations(x, <param name=y> z </param>)" }
+    ;
+
+nameClass: #(Boolean isElem): # Elements  ::=
+    innerNameClass
+    ;
+
+innerNameClass: #(Boolean isElem, Xml anno): # Elements  ::=
+    annotatedSimpleNameClass
+    |  nameClassChoice
+    |  annotatedExceptNameClass
+        { "applyAnnotationsChoiceExcept(anno, x)" }
+    ;
+
+nameClassChoice: # (Boolean isElem): # Elements  ::=
+    annotatedSimpleNameClass '|'  annotatedSimpleNameClass
+        { "many | annotatedSimpleNameClass" }
+    |  annotatedSimpleNameClass '|'  nameClassChoice
+        { "two | annotatedsimplenameclass" }
+    ;
+
+annotatedExceptNameClass: #(Boolean isElem): # Elements  ::=
+    leadAnnotatedExceptNameClass followAnnotations
+        { say "(x, y)" }
+    ;
+
+leadAnnotatedExceptNameClass: #(Boolean isElem): # Element  ::=
+    annotations  exceptNameClass
+        { "applyAnnotations(x, y)" }
+    ;
+
+annotatedSimpleNameClass: #(Boolean isElem): # Elements  ::=
+    leadAnnotatedSimpleNameClass.lead followAnnotations.follow
+        { if ($follow) {
+            die "FIXME";
+          } else {
+            return $lead;
+          }
+        }
+    ;
+
+leadAnnotatedSimpleNameClass: #(Boolean isElem): # Elements  ::=
+    annotations.anno simpleNameClass.simple
+        { if ($anno) {
+           die "FIXME";
+          } else {
+           return $simple;
+          }
+        }
+    |  annotations '('  innerNameClass  ')'
+        { "y" }
+    ;
+
+exceptNameClass: #(Boolean isElem): # Element  ::=
+    nsName '-'  leadAnnotatedSimpleNameClass
+        { say "<nsName makeNsAttribute(lookupPrefix(environment, x))> <except> y </except> </nsName>" }
+    |  '*'  '-'  leadAnnotatedSimpleNameClass
+        { say "<anyName> <except> x </except> </anyName>" }
+    ;
+
+simpleNameClass: #(Boolean isElem): # Element  ::=
+    identifierOrKeyword
+    |  CName.name
+      { 
+       $_[1][2]
+      }
+    |  nsName
+      { $_[1][2] }
+    |  '*'
+      { $_[1][2] }
+    ;
+
+followAnnotations: # Elements  ::=
+    # empty
+        { () }
+    |  '>>'  annotationElement followAnnotations
+        { [$_[2], $_[3]] }
+    ;
+
+annotations: # Xml  ::=
+    documentations
+        { $_[1] }
+    |  documentations.doc '['  annotationAttributes.attr  annotationElements.elem  ']'
+        { [$attr, $doc, $elem] }
+    ;
+
+annotationAttributes: # Attributes  ::=
+    # empty
+        { say "( )" }
+    |  foreignAttributeName '='  literal  annotationAttributes
+        # # Constraint: duplicate attributes
+        { say "(attribute(x, y), z)" }
+    ;
+
+foreignAttributeName: # Name  ::=
+    prefixedName
+        # Constraint: xmlns namespace URI
+        # Constraint: unqualified name
+        # Constraint: RELAX NG namespace URI
+    ;
+
+annotationElements: # Elements  ::=
+    # empty
+        { say "( )" }
+    |  annotationElement annotationElements
+        { say "(x, y)" }
+    ;
+
+annotationElement: # Element  ::=
+    foreignElementName annotationAttributesContent
+        { say "element(environment, x, y)" }
+    ;
+
+foreignElementName: # Name  ::=
+    identifierOrKeyword
+        { say "name('', x)" }
+    |  prefixedName
+        # Constraint: RELAX NG namespace URI
+    ;
+
+annotationElementNotKeyword: # Element  ::=
+    foreignElementNameNotKeyword  annotationAttributesContent
+        { say "element(environment, x, y)" }
+    ;
+
+foreignElementNameNotKeyword: # Name  ::=
+    identifier
+        { say "name('', x)" }
+    |  prefixedName
+        # Constraint: RELAX NG namespace URI
+    ;
+
+annotationAttributesContent: # Xml  ::=
+    '['  nestedAnnotationAttributes annotationContent  ']'
+        { say "(x, y)" }
+    ;
+
+nestedAnnotationAttributes: # Attributes  ::=
+    # empty
+        { say "( )" }
+    |  anyAttributeName '='  literal  nestedAnnotationAttributes
+        # Constraint: duplicate attributes
+        { say "(attribute(x, y), z)" }
+    ;
+
+anyAttributeName: # Name  ::=
+    identifierOrKeyword
+        { say "name('', x)" }
+    |  prefixedName
+        # Constraint: xmlns namespace URI
+    ;
+
+annotationContent: # Content  ::=
+    # empty
+        { say "( )" }
+    |  nestedAnnotationElement annotationContent
+        { say "(x, y)" }
+    |  literal annotationContent
+        { say "(text(x), y)" }
+    ;
+
+nestedAnnotationElement: # Element  ::=
+    anyElementName  annotationAttributesContent
+        { say "element(environment, x, y)" }
+    ;
+
+anyElementName: # Name  ::=
+    identifierOrKeyword
+        { say "name('', x)" }
+    |  prefixedName
+    ;
+
+prefixedName: # Name  ::=
+    CName
+        # Constraint: annotation inherit
+        { say "name(lookupPrefix(environment, prefix(x)), localPart(x))" }
+    ;
+
+documentations: # Elements  ::=
+    # empty
+        { return; }
+    |  documentation.left documentations.right
+        { +[ $left->[2], ( $right ? (@{ $right }) : () ) ] }
+    ;
+
+identifierOrKeyword: # String  ::=
+    identifier
+     { $_[1][2] }
+    |  keyword
+     { $_[1][2] }
+    ;
+
+keyword: # String  ::=
+    'attribute'
+    |  'default'
+    |  'datatypes'
+    |  'div'
+    |  'element'
+    |  'empty'
+    |  'external'
+    |  'grammar'
+    |  'include'
+    |  'inherit'
+    |  'list'
+    |  'mixed'
+    |  'namespace'
+    |  'notAllowed'
+    |  'parent'
+    |  'start'
+    |  'string'
+    |  'text'
+    |  'token'
+    ;
+
+
+
+
+%%
+
